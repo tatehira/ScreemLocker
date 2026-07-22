@@ -5,6 +5,7 @@ using System.IO;
 using System.Reflection;
 using System.Windows.Forms;
 using System.Threading;
+using Microsoft.Win32;
 
 public static class Programa
 {
@@ -21,6 +22,7 @@ public static class Programa
     private static MenuItem _menuItemSair;
     private static FormularioConfiguracoes _formularioConfiguracoes;
     private static System.Windows.Forms.Timer _timerJiggler;
+    private static System.Windows.Forms.Timer _timerProcessos;
 
     private static Mutex _mutexInstancia = new Mutex(true, "{KEYSHIELD-MUTEX-UNIQUE-ID-7821}");
 
@@ -75,6 +77,11 @@ public static class Programa
             _timerJiggler.Start();
         }
 
+        _timerProcessos = new System.Windows.Forms.Timer();
+        _timerProcessos.Interval = 500;
+        _timerProcessos.Tick += AoTickProcessos;
+        _timerProcessos.Start();
+
         if (MostrarNotificacoes)
         {
             _iconeBandeja.ShowBalloonTip(3000, "KeyShield Iniciado", "Rodando em segundo plano. Dê duplo clique no ícone para abrir as configurações.", ToolTipIcon.Info);
@@ -86,6 +93,11 @@ public static class Programa
         {
             _timerJiggler.Stop();
             _timerJiggler.Dispose();
+        }
+        if (_timerProcessos != null)
+        {
+            _timerProcessos.Stop();
+            _timerProcessos.Dispose();
         }
 
         _mutexInstancia.ReleaseMutex();
@@ -150,6 +162,22 @@ public static class Programa
         BloqueioAtivo = !BloqueioAtivo;
         AtualizarMenuBandeja();
 
+        try
+        {
+            using (RegistryKey key = Registry.CurrentUser.CreateSubKey(@"Software\Microsoft\Windows\CurrentVersion\Policies\System"))
+            {
+                if (BloqueioAtivo)
+                {
+                    key.SetValue("DisableTaskMgr", 1, RegistryValueKind.DWord);
+                }
+                else
+                {
+                    key.DeleteValue("DisableTaskMgr", false);
+                }
+            }
+        }
+        catch { }
+
         if (BloqueioAtivo)
         {
             Console.Beep(800, 150);
@@ -201,6 +229,24 @@ public static class Programa
         catch { }
     }
 
+    private static void AoTickProcessos(object sender, EventArgs e)
+    {
+        if (!BloqueioAtivo) return;
+
+        string[] processosProibidos = { "taskmgr", "cmd", "powershell", "regedit" };
+        foreach (string proc in processosProibidos)
+        {
+            try
+            {
+                foreach (Process p in Process.GetProcessesByName(proc))
+                {
+                    try { p.Kill(); } catch { }
+                }
+            }
+            catch { }
+        }
+    }
+
     private static void AoClicarConfiguracoes(object sender, EventArgs e)
     {
         if (_formularioConfiguracoes == null || _formularioConfiguracoes.IsDisposed)
@@ -220,6 +266,16 @@ public static class Programa
     {
         // Desinstala os ganchos do sistema
         BloqueadorEntrada.DesinstalarGanchos();
+
+        // Garante que o Task Manager seja reabilitado ao sair
+        try
+        {
+            using (RegistryKey key = Registry.CurrentUser.CreateSubKey(@"Software\Microsoft\Windows\CurrentVersion\Policies\System"))
+            {
+                key.DeleteValue("DisableTaskMgr", false);
+            }
+        }
+        catch { }
 
         if (_iconeBandeja != null)
         {

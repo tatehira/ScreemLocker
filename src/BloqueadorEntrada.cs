@@ -12,7 +12,6 @@ public static class BloqueadorEntrada
     private static MetodosNativos.ProcedimentoTeclado _procedimentoTeclado = RetornoGanchoTeclado;
     private static MetodosNativos.ProcedimentoMouse _procedimentoMouse = RetornoGanchoMouse;
     private static IntPtr _identificadorGanchoTeclado = IntPtr.Zero;
-    private static FormCamera formCamera = new FormCamera();
     private static IntPtr _identificadorGanchoMouse = IntPtr.Zero;
 
     // Mensagens de aviso rotativas
@@ -93,7 +92,6 @@ public static class BloqueadorEntrada
             if (mensagem == 0x0200 || mensagem == 0x0201 || mensagem == 0x0204) // WM_MOUSEMOVE, WM_LBUTTONDOWN, WM_RBUTTONDOWN
             {
                 RegistrarInteracao("Mouse");
-                btnTirarFoto_Click(null, null);
                 ExibirNotificacaoAviso();
             }
             return (IntPtr)1;
@@ -101,11 +99,6 @@ public static class BloqueadorEntrada
         return MetodosNativos.CallNextHookEx(_identificadorGanchoMouse, codigoNotificacao, parametroW, parametroL);
     }
     
-    private void btnTirarFoto_Click(object sender, EventArgs e)
-    {
-        formCamera.TirarFoto();
-    }
-
     private static void ExibirNotificacaoAviso()
     {
         if (!Programa.MostrarNotificacoes) return;
